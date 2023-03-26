@@ -132,7 +132,7 @@ export class DeskAccessory {
     // eslint-disable-next-line no-constant-condition
     while (true){
       if(this.state === this.platform.Characteristic.PositionState.STOPPED) {
-        await delay(100);
+        await delay(300);
         continue;
       }
 
@@ -158,7 +158,7 @@ export class DeskAccessory {
       try {
         this.platform.log.debug('run cmd', cmd);
         await this.commander.writeValue(cmd);
-        await delay(200);
+        await delay(300);
       } catch (e: any) {
         this.platform.log.error(e);
       }
