@@ -21,6 +21,11 @@ import struct from '@aksel/structjs';
  * An instance of this class is created for each accessory your platform registers
  * Each accessory may expose multiple services of different service types.
  */
+
+const CmdStop = Buffer.from('f1f12b002b7e', 'hex');
+const CmdRaise = Buffer.from('f1f10100017e', 'hex');
+const CmdLower = Buffer.from('f1f10200027e', 'hex');
+
 export class DeskAccessory {
   private service: Service;
 
@@ -118,8 +123,9 @@ export class DeskAccessory {
     });
 
     this.commander = await deskService.getCharacteristic('0000ff01-0000-1000-8000-00805f9b34fb');
-    await this.commander.writeValue(Buffer.from('f1f10100017e', 'hex')); //raise
-    await this.commander.writeValue(Buffer.from('f1f12b002b7e', 'hex')); //stop
+    await this.commander.writeValue(CmdRaise);
+    await this.commander.writeValue(CmdLower);
+    await this.commander.writeValue(CmdStop);
   }
 
   async apply() {
@@ -135,17 +141,17 @@ export class DeskAccessory {
 
       let cmd;
       if (this.state === this.platform.Characteristic.PositionState.INCREASING) {
+        cmd = CmdRaise;
         if (this.currentPos >= this.targetPos) {
           this.state = this.platform.Characteristic.PositionState.STOPPED;
-          continue;
+          cmd = CmdStop;
         }
-        cmd = Buffer.from('f1f10100017e', 'hex');
       } else if (this.state === this.platform.Characteristic.PositionState.DECREASING) {
+        cmd = CmdLower;
         if (this.currentPos <= this.targetPos) {
           this.state = this.platform.Characteristic.PositionState.STOPPED;
-          continue;
+          cmd = CmdStop;
         }
-        cmd = Buffer.from('f1f10200027e', 'hex');
       }
 
       if (!cmd){
@@ -154,6 +160,7 @@ export class DeskAccessory {
 
       try {
         await this.commander.writeValue(cmd);
+        await delay(1000);
       } catch (e: any) {
         this.platform.log.error(e);
       }
