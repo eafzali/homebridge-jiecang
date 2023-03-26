@@ -121,6 +121,7 @@ export class DeskAccessory {
 
     this.commander = await deskService.getCharacteristic('0000ff01-0000-1000-8000-00805f9b34fb');
     await this.commander.writeValue(CmdRaise);
+    await this.commander.writeValue(CmdStop);
     await this.commander.writeValue(CmdLower);
     await this.commander.writeValue(CmdStop);
   }
@@ -132,7 +133,7 @@ export class DeskAccessory {
     // eslint-disable-next-line no-constant-condition
     while (true){
       if(this.state === this.platform.Characteristic.PositionState.STOPPED) {
-        await delay(300);
+        await delay(500);
         continue;
       }
 
@@ -158,7 +159,7 @@ export class DeskAccessory {
       try {
         this.platform.log.debug('run cmd', cmd);
         await this.commander.writeValue(cmd);
-        await delay(300);
+        await delay(500);
       } catch (e: any) {
         this.platform.log.error(e);
       }
