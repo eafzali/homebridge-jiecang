@@ -104,6 +104,7 @@ export class DeskAccessory {
       const [ height ] = struct('xxxxh').unpack(Uint8Array.from(buffer).buffer);
       this.platform.log.debug('height', height);
       this.currentPos = this.HeightToPercentage(height/10);
+      this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition).updateValue(this.currentPos);
     });
 
     const command = await deskService.getCharacteristic('0000ff01-0000-1000-8000-00805f9b34fb');
