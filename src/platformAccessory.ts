@@ -78,11 +78,9 @@ export class DeskAccessory {
       this.platform.log.error(e);
     });
 
-    setInterval(() => {
-      this.apply().catch(e => {
-        this.platform.log.error(e);
-      });
-    }, 2 * 1000);
+    this.apply().catch(e => {
+      this.platform.log.error(e);
+    });
 
     /**
      * Creating multiple services of the same type.
@@ -125,29 +123,41 @@ export class DeskAccessory {
   }
 
   async apply() {
-    if(!this.commander && this.state === this.platform.Characteristic.PositionState.STOPPED) {
-      return;
+    while (!this.commander) {
+      await delay(1000);
     }
-    let cmd;
-    if (this.state === this.platform.Characteristic.PositionState.INCREASING) {
-      if (this.currentPos >= this.targetPos) {
-        this.state = this.platform.Characteristic.PositionState.STOPPED;
-        return;
+    // eslint-disable-next-line no-constant-condition
+    while (true){
+      if(this.state === this.platform.Characteristic.PositionState.STOPPED) {
+        await delay(100);
+        continue;
       }
-      cmd = Buffer.from('f1f10100017e', 'hex');
-    } else if (this.state === this.platform.Characteristic.PositionState.DECREASING) {
-      if (this.currentPos <= this.targetPos) {
-        this.state = this.platform.Characteristic.PositionState.STOPPED;
-        return;
+
+      let cmd;
+      if (this.state === this.platform.Characteristic.PositionState.INCREASING) {
+        if (this.currentPos >= this.targetPos) {
+          this.state = this.platform.Characteristic.PositionState.STOPPED;
+          continue;
+        }
+        cmd = Buffer.from('f1f10100017e', 'hex');
+      } else if (this.state === this.platform.Characteristic.PositionState.DECREASING) {
+        if (this.currentPos <= this.targetPos) {
+          this.state = this.platform.Characteristic.PositionState.STOPPED;
+          continue;
+        }
+        cmd = Buffer.from('f1f10200027e', 'hex');
       }
-      cmd = Buffer.from('f1f10200027e', 'hex');
-    }
 
-    if (!cmd){
-      return;
-    }
+      if (!cmd){
+        continue;
+      }
 
-    await this.commander.writeValue(cmd);
+      try {
+        await this.commander.writeValue(cmd);
+      } catch (e: any) {
+        this.platform.log.error(e);
+      }
+    }
   }
 
 
@@ -217,4 +227,8 @@ export class DeskAccessory {
     this.platform.log.debug('Triggered GET CurrentPosition');
     return this.currentPos;
   }
+}
+
+function delay(ms: number) {
+  return new Promise( resolve => setTimeout(resolve, ms) );
 }
