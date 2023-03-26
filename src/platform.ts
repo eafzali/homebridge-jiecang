@@ -8,7 +8,7 @@ import { DeskAccessory } from './platformAccessory';
  * This class is the main constructor for your plugin, this is where you should
  * parse the user config and discover/register accessories with Homebridge.
  */
-export class LinakDeskPlatform implements DynamicPlatformPlugin {
+export class JiecangDeskController implements DynamicPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
 
@@ -31,14 +31,6 @@ export class LinakDeskPlatform implements DynamicPlatformPlugin {
       this.log.error('No desks have been configured.');
       return;
     }
-
-    // If we don't have any blinds configured, we're done here.
-    if(!config.idasenControllerPath) {
-      this.log.error('No idasen-controller-path has been configured.');
-      return;
-    }
-
-
 
     this.log.debug('Finished initializing platform:', this.config.name);
 
@@ -82,11 +74,11 @@ export class LinakDeskPlatform implements DynamicPlatformPlugin {
       }
 
       if (!device.baseHeight) {
-        device.baseHeight = 620;
+        device.baseHeight = 26;
       }
 
       if (!device.movementRange) {
-        device.movementRange = 650;
+        device.movementRange = 42;
       }
 
       // generate a unique id for the accessory this should be generated from

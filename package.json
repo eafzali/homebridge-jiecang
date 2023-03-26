@@ -1,16 +1,16 @@
 {
+  "displayName": "Jiecang Bluetooth Desk Control",
   "private": false,
-  "displayName": "Linak Bluetooth Desk Control",
-  "name": "homebridge-linak",
+  "name": "homebridge-jiecang",
   "version": "1.1.2",
-  "description": "This plugin allows you to expose your Linak Desk Motor as Blinds in Homekit",
+  "description": "This plugin allows you to expose your Jiecang Desk Motor as Blinds in Homekit",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git://github.com/vniehues/linak-homebridge.git"
+    "url": "git://github.com/eafzali/jiecang-homebridge.git"
   },
   "bugs": {
-    "url": "https://github.com/vniehues/linak-homebridge/issues"
+    "url": "https://github.com/eafzali/jiecang-homebridge/issues"
   },
   "engines": {
     "node": ">=14.18.1",
@@ -32,7 +32,6 @@
     "@typescript-eslint/parser": "^5.0.0",
     "eslint": "^8.0.1",
     "homebridge": "^1.3.5",
-    "idasen-controller": "^1.3.0",
     "nodemon": "^2.0.13",
     "rimraf": "^3.0.2",
     "ts-node": "^10.3.0",
@@ -40,7 +39,9 @@
   },
   "dependencies": {
     "@abandonware/noble": "^1.9.2-15",
+    "@aksel/structjs": "^1.0.0",
     "@s524797336/noble-mac": "^0.1.2",
-    "noble": "^1.9.1"
+    "noble": "^1.9.1",
+    "node-ble": "^1.9.0"
   }
 }

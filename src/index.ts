@@ -7,5 +7,5 @@ import { LinakDeskPlatform } from './platform';
  * This method registers the platform with Homebridge
  */
 export = (api: API) => {
-  api.registerPlatform(PLATFORM_NAME, LinakDeskPlatform);
+  api.registerPlatform(PLATFORM_NAME, JiecangDeskController);
 };

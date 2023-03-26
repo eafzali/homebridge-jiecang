@@ -1,5 +1,5 @@
 {
-  "pluginAlias": "LinakController",
+  "pluginAlias": "JiecangController",
   "pluginType": "platform",
   "schema": {
     "type": "object",
@@ -8,20 +8,7 @@
         "title": "Name",
         "type": "string",
         "required": true,
-        "default": "Linak Platform"
-      },
-      "pollingRate": {
-        "title": "Polling timeout",
-        "type": "number",
-        "required": true,
-        "default": 20,
-        "minimum": 10
-      },
-      "idasenControllerPath": {
-        "title": "Path to Idasen-Controller",
-        "type": "string",
-        "required": true,
-        "default": "/home/pi/.local/bin/idasen-controller"
+        "default": "Jarvis Platform"
       },
       "desks": {
         "type": "array",
@@ -34,7 +21,7 @@
               "title": "Name",
               "type": "string",
               "required": true,
-              "default": "Linak Desk"
+              "default": "Jarvis Desk"
             },
             "macAddress": {
               "title": "Desk MAC Address",
@@ -43,16 +30,16 @@
               "default": ""
             },
             "baseHeight": {
-              "title": "Base height",
+              "title": "Base height in inches",
               "type": "number",
               "required": true,
-              "default": "620"
+              "default": "26"
             },
-            "movementRange": {
-              "title": "Range of movement",
+            "maxHeight": {
+              "title": "Max Height in inches",
               "type": "number",
               "required": true,
-              "default": "650"
+              "default": "42"
             }
           }
         }

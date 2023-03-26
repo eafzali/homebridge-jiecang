@@ -1,7 +1,8 @@
 /* eslint-disable no-console */
 import {PlatformAccessory, Service} from 'homebridge';
-import {LinakDeskPlatform} from './platform';
-import {exec} from 'child_process';
+import {JiecangDeskController} from './platform';
+import {createBluetooth} from 'node-ble';
+import struct from '@aksel/structjs';
 
 // const UUID_HEIGHT = '99fa0021-338a-1024-8a49-009c0215f78a';
 // const UUID_COMMAND = '99fa0002-338a-1024-8a49-009c0215f78a';
@@ -22,35 +23,22 @@ import {exec} from 'child_process';
  */
 export class DeskAccessory {
   private service: Service;
+
   private currentPos = 40;
-  private isMoving = false;
-  private isPolling = false;
-  private currentlyRequestingMove = false;
+  private currentState;
 
-  private currentPollProcess;
-  private currentMoveProcess;
-
-  private requestedPosTimer;
-
-  private baseCommand;
-
-
-
-  private maxRetries = 3;
-  private currentMoveRetry = 0;
-
-
+  private targetPos = 40;
 
   constructor(
-    private readonly platform: LinakDeskPlatform,
+    private readonly platform: JiecangDeskController,
     private readonly accessory: PlatformAccessory,
   ) {
 
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Default-Manufacturer')
-      .setCharacteristic(this.platform.Characteristic.Model, 'Default-Model')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'Default-Serial');
+      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Jiecang')
+      .setCharacteristic(this.platform.Characteristic.Model, 'Bluetooth Desk Controller')
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, 'JCP35N-BLT');
 
     // get the LightBulb service if it exists, otherwise create a new LightBulb service
     // you can create multiple services for each accessory
@@ -62,7 +50,8 @@ export class DeskAccessory {
     this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.name);
 
     // Initialize our state as stopped.
-    this.service.setCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
+    this.currentState = this.platform.Characteristic.PositionState.STOPPED;
+    this.service.setCharacteristic(this.platform.Characteristic.PositionState, this.currentState);
 
     // each service must implement at-minimum the "required characteristics" for the given service type
     // see https://developers.homebridge.io/#/service/Lightbulb
@@ -80,9 +69,12 @@ export class DeskAccessory {
 
 
     this.platform.log.debug('configuring desk: ', this.accessory.context.device);
-    this.baseCommand = this.platform.config.idasenControllerPath + ' --mac-address ' + this.accessory.context.device.macAddress
-        + ' --base-height ' + this.accessory.context.device.baseHeight
-        + ' --movement-range ' + this.accessory.context.device.movementRange;
+
+    this.init().then(() => {
+      this.platform.log.debug('initialized');
+    }).catch(e => {
+      this.platform.log.error(e);
+    });
 
     /**
      * Creating multiple services of the same type.
@@ -94,15 +86,29 @@ export class DeskAccessory {
      * The USER_DEFINED_SUBTYPE must be unique to the platform accessory (if you platform exposes multiple accessories, each accessory
      * can use the same sub type id.)
      */
+  }
 
-    const pollinginterval = this.platform.config.pollingRate > 10 ? this.platform.config.pollingRate : 10;
+  async init() {
+    const {bluetooth, destroy} = createBluetooth();
+    const adapter = await bluetooth.defaultAdapter();
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const interval = setInterval(() => {
-      this.poll();
-    }, pollinginterval * 1000);
+    const device = await adapter.waitDevice(this.accessory.context.device.macAddress);
+    await device.connect();
+    const gattServer = await device.gatt();
 
-    //  clearInterval(interval);
+    const deskService = await gattServer.getPrimaryService('0000ff12-0000-1000-8000-00805f9b34fb');
+
+    const status = await deskService.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
+    await status.startNotifications();
+    status.on('valuechanged', buffer => {
+      const [ height ] = struct('xxxxh').unpack(Uint8Array.from(buffer).buffer);
+      this.platform.log.debug('height', height);
+      this.currentPos = this.HeightToPercentage(height/10);
+    });
+
+    const command = await deskService.getCharacteristic('0000ff01-0000-1000-8000-00805f9b34fb');
+    await command.writeValue(Buffer.from('f1f10100017e', 'hex'));
+    await command.writeValue(Buffer.from('f1f12b002b7e', 'hex'));
   }
 
 
@@ -113,145 +119,15 @@ export class DeskAccessory {
   // Percentage = (100 * "height") / ("max" - "min") - (100 * "min") / ("max" - "min")
 
   PercentageToHeight(percentage: number) {
-    return Math.round(this.accessory.context.device.baseHeight + (percentage / 100) * (this.accessory.context.device.movementRange));
+    const range = this.accessory.context.device.maxHeight - this.accessory.context.device.baseHeight;
+    return Math.round(this.accessory.context.device.baseHeight + (percentage / 100) * range);
   }
 
   HeightToPercentage(height: number) {
-    return Math.round( (100 * height) / (this.accessory.context.device.movementRange)
-        - (100 * this.accessory.context.device.baseHeight) / this.accessory.context.device.movementRange);
+    const range = this.accessory.context.device.maxHeight - this.accessory.context.device.baseHeight;
+    return Math.round( (100 * height) / range
+        - (100 * this.accessory.context.device.baseHeight) / range);
   }
-
-  poll() {
-    if (!this.isMoving && !this.isPolling && !this.currentlyRequestingMove) {
-
-      this.isPolling = true;
-
-      const pollcommand = this.baseCommand;
-
-      this.currentPollProcess = exec(pollcommand, (error, stdout, stderr) => {
-        if (stderr) {
-          this.isPolling = false;
-          this.platform.log.debug('polling std error:', stderr.toString());
-        }
-        if (error) {
-          this.isPolling = false;
-          if (error.signal !== 'SIGINT') {
-            this.platform.log.debug('polling error:', error);
-          } else {
-            // We killed it, lets return.
-            return;
-          }
-        }
-        if (stdout) {
-          try {
-            const outputString = stdout.toString();
-
-            if (outputString === null || outputString === '' || !outputString.includes('Height:')) {
-              this.platform.log.debug('polling complete without usable information:', outputString);
-              return;
-            }
-
-            const splitFirst = outputString.split('Height:')[1];
-
-            const heightStr = splitFirst.split('mm')[0];
-
-            const height_rel: number = this.HeightToPercentage(+heightStr);
-
-            const currentValue = Math.round(height_rel);
-
-            this.platform.log.debug('found height%: ', currentValue);
-
-            //Don't update while moving. Might interrupt movement!
-            if (!this.isMoving && !this.currentlyRequestingMove) {
-              this.platform.log.debug('Updating polled values!');
-
-              this.currentPos = currentValue;
-
-              this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition).updateValue(this.currentPos);
-              this.service.getCharacteristic(this.platform.Characteristic.TargetPosition).updateValue(this.currentPos);
-            } else {
-              this.platform.log.debug('Not updating polled values because we are moving!');
-            }
-            return;
-          } catch (error) {
-            this.platform.log.debug('polling error:', error);
-          } finally {
-            this.isPolling = false;
-          }
-        }
-      });
-    }
-  }
-
-
-  async moveToPercent(percentage: number) {
-
-    if (this.currentMoveRetry > this.maxRetries) {
-      return;
-    }
-
-    const newheight = this.PercentageToHeight(percentage);
-
-    const moveCommand = this.baseCommand + ' --move-to ' + newheight;
-
-    this.isMoving = true;
-
-    this.currentPollProcess?.kill('SIGINT');
-    this.currentPollProcess = null;
-
-    this.currentMoveProcess = exec(moveCommand, (error, stdout, stderr) => {
-      if (stderr) {
-        this.platform.log.debug('moving std error:', stderr.toString());
-      }
-      if (error) {
-        if (error.signal !== 'SIGINT') {
-          this.platform.log.debug('moving error:', error);
-          this.currentMoveRetry = this.currentMoveRetry + 1;
-          this.moveToPercent(percentage);
-        } else {
-          // We killed it, lets return.
-          return;
-        }
-      }
-      if (stdout) {
-        try {
-          const outputString = stdout.toString();
-
-          if (outputString === null || outputString === '' || !outputString.includes('Final height:')) {
-            this.platform.log.debug('moving complete without usable information:', outputString);
-            return;
-          }
-
-          const splitFirst = outputString.split('Final height:')[1];
-
-          const heightStr = splitFirst.split('mm')[0];
-
-          const height_rel: number = this.HeightToPercentage(+heightStr);
-
-          const currentValue = height_rel;
-
-          this.platform.log.debug('new height%: ', currentValue);
-
-          this.platform.log.debug('setting new values!');
-
-          this.currentPos = currentValue;
-
-          this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition).updateValue(this.currentPos);
-          this.service.getCharacteristic(this.platform.Characteristic.TargetPosition).updateValue(this.currentPos);
-
-        } catch (error) {
-          this.platform.log.debug('moving error:', error);
-        } finally {
-          this.platform.log.debug('resetting move state');
-          this.currentMoveRetry = 0;
-          this.isMoving = false;
-          this.service.getCharacteristic(this.platform.Characteristic.PositionState)
-            .updateValue(this.platform.Characteristic.PositionState.STOPPED);
-        }
-      }
-    });
-  }
-
 
   // HomeKit setter & getters
   // TargetPosition get & set
@@ -265,25 +141,7 @@ export class DeskAccessory {
     this.platform.log.debug('Triggered SET TargetPosition:', value);
 
     // We don't want any status refreshes until we complete the move.
-    this.currentlyRequestingMove = true;
-
-    clearTimeout(this.requestedPosTimer);
-    this.requestedPosTimer = setTimeout(() => {
-
-      this.platform.log.debug('executing move to: ', value);
-
-      const moveUp = value > this.currentPos;
-
-      const positionState = moveUp ? this.platform.Characteristic.PositionState.INCREASING
-        : this.platform.Characteristic.PositionState.DECREASING;
-
-      // Tell HomeKit we're on the move.
-      this.service.getCharacteristic(this.platform.Characteristic.PositionState).updateValue(positionState);
-
-      setTimeout(() => this.moveToPercent(value), 100);
-
-      this.currentlyRequestingMove = false;
-    }, 1500);
+    this.targetPos = value;
   }
 
   /**
@@ -291,7 +149,7 @@ export class DeskAccessory {
    */
   handleTargetPositionGet() {
     this.platform.log.debug('Triggered GET TargetPosition');
-    return this.currentPos;
+    return this.targetPos;
   }
 
   /**
@@ -300,7 +158,12 @@ export class DeskAccessory {
   handlePositionStateGet() {
     this.platform.log.debug('Triggered GET PositionState');
 
-    // set this to a valid value for PositionState
+    if (this.targetPos > this.currentPos) {
+      return this.platform.Characteristic.PositionState.INCREASING;
+    } else if (this.targetPos < this.currentPos) {
+      return this.platform.Characteristic.PositionState.DECREASING;
+    }
+
     return this.platform.Characteristic.PositionState.STOPPED;
   }
 
@@ -309,7 +172,6 @@ export class DeskAccessory {
      */
   handleCurrentPositionGet() {
     this.platform.log.debug('Triggered GET CurrentPosition');
-    setTimeout(() => this.poll(), 100);
     return this.currentPos;
   }
 }
