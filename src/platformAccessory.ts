@@ -4,18 +4,6 @@ import {JiecangDeskController} from './platform';
 import {createBluetooth} from 'node-ble';
 import struct from '@aksel/structjs';
 
-// const UUID_HEIGHT = '99fa0021-338a-1024-8a49-009c0215f78a';
-// const UUID_COMMAND = '99fa0002-338a-1024-8a49-009c0215f78a';
-// const UUID_REFERENCE_INPUT = '99fa0031-338a-1024-8a49-009c0215f78a';
-
-// const COMMAND_UP = bytearray(struct.pack("<H", 71))
-// const COMMAND_DOWN = bytearray(struct.pack("<H", 70))
-// const COMMAND_STOP = bytearray(struct.pack("<H", 255))
-//
-// const COMMAND_REFERENCE_INPUT_STOP = bytearray(struct.pack("<H", 32769))
-// const COMMAND_REFERENCE_INPUT_UP = bytearray(struct.pack("<H", 32768))
-// const COMMAND_REFERENCE_INPUT_DOWN = bytearray(struct.pack("<H", 32767))
-
 /**
  * Platform Accessory
  * An instance of this class is created for each accessory your platform registers
@@ -123,9 +111,11 @@ export class DeskAccessory {
       } else if (this.state === this.platform.Characteristic.PositionState.INCREASING && this.currentPos >= this.targetPos) {
         this.state = this.platform.Characteristic.PositionState.STOPPED;
         this.commander.writeValue(CmdStop);
+        this.platform.log.debug('run stop');
       } else if (this.state === this.platform.Characteristic.PositionState.DECREASING && this.currentPos <= this.targetPos) {
         this.state = this.platform.Characteristic.PositionState.STOPPED;
         this.commander.writeValue(CmdStop);
+        this.platform.log.debug('run stop');
       }
     });
 
@@ -168,7 +158,7 @@ export class DeskAccessory {
       try {
         this.platform.log.debug('run cmd', cmd);
         await this.commander.writeValue(cmd);
-        await delay(100);
+        await delay(200);
       } catch (e: any) {
         this.platform.log.error(e);
       }
