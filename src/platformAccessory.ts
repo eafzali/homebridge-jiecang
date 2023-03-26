@@ -120,6 +120,12 @@ export class DeskAccessory {
         this.targetPos = this.currentPos;
         this.platform.log.debug('update target height', height, this.targetPos);
         this.service.getCharacteristic(this.platform.Characteristic.TargetPosition).updateValue(this.targetPos);
+      } else if (this.state === this.platform.Characteristic.PositionState.INCREASING && this.currentPos >= this.targetPos) {
+        this.state = this.platform.Characteristic.PositionState.STOPPED;
+        this.commander.writeValue(CmdStop);
+      } else if (this.state === this.platform.Characteristic.PositionState.DECREASING && this.currentPos <= this.targetPos) {
+        this.state = this.platform.Characteristic.PositionState.STOPPED;
+        this.commander.writeValue(CmdStop);
       }
     });
 
