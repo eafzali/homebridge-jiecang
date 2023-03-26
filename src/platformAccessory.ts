@@ -24,10 +24,10 @@ import struct from '@aksel/structjs';
 export class DeskAccessory {
   private service: Service;
 
-  private currentPos = 40;
-  private currentState;
+  private currentPos = 0;
+  private targetPos = 0;
 
-  private targetPos = 40;
+  private applying = false;
 
   constructor(
     private readonly platform: JiecangDeskController,
@@ -50,8 +50,7 @@ export class DeskAccessory {
     this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.name);
 
     // Initialize our state as stopped.
-    this.currentState = this.platform.Characteristic.PositionState.STOPPED;
-    this.service.setCharacteristic(this.platform.Characteristic.PositionState, this.currentState);
+    this.service.setCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
 
     // each service must implement at-minimum the "required characteristics" for the given service type
     // see https://developers.homebridge.io/#/service/Lightbulb
@@ -102,9 +101,13 @@ export class DeskAccessory {
     await status.startNotifications();
     status.on('valuechanged', buffer => {
       const [ height ] = struct('xxxxh').unpack(Uint8Array.from(buffer).buffer);
-      this.platform.log.debug('height', height);
       this.currentPos = this.HeightToPercentage(height/10);
+      this.platform.log.debug('height', height, this.currentPos);
       this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition).updateValue(this.currentPos);
+      if (!this.applying) {
+        this.targetPos = this.currentPos;
+        this.service.getCharacteristic(this.platform.Characteristic.TargetPosition).updateValue(this.targetPos);
+      }
     });
 
     const command = await deskService.getCharacteristic('0000ff01-0000-1000-8000-00805f9b34fb');
