@@ -27,7 +27,9 @@ export class DeskAccessory {
   private currentPos = 0;
   private targetPos = 0;
 
-  private applying = false;
+  private state;
+
+  private commander;
 
   constructor(
     private readonly platform: JiecangDeskController,
@@ -50,7 +52,8 @@ export class DeskAccessory {
     this.service.setCharacteristic(this.platform.Characteristic.Name, accessory.context.device.name);
 
     // Initialize our state as stopped.
-    this.service.setCharacteristic(this.platform.Characteristic.PositionState, this.platform.Characteristic.PositionState.STOPPED);
+    this.state = this.platform.Characteristic.PositionState.STOPPED;
+    this.service.setCharacteristic(this.platform.Characteristic.PositionState, this.state);
 
     // each service must implement at-minimum the "required characteristics" for the given service type
     // see https://developers.homebridge.io/#/service/Lightbulb
@@ -74,6 +77,12 @@ export class DeskAccessory {
     }).catch(e => {
       this.platform.log.error(e);
     });
+
+    setInterval(() => {
+      this.apply().catch(e => {
+        this.platform.log.error(e);
+      });
+    }, 2 * 1000);
 
     /**
      * Creating multiple services of the same type.
@@ -104,15 +113,41 @@ export class DeskAccessory {
       this.currentPos = this.HeightToPercentage(height/10);
       this.platform.log.debug('height', height, this.currentPos);
       this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition).updateValue(this.currentPos);
-      if (!this.applying) {
+      if (this.state === this.platform.Characteristic.PositionState.STOPPED) {
         this.targetPos = this.currentPos;
         this.service.getCharacteristic(this.platform.Characteristic.TargetPosition).updateValue(this.targetPos);
       }
     });
 
-    const command = await deskService.getCharacteristic('0000ff01-0000-1000-8000-00805f9b34fb');
-    await command.writeValue(Buffer.from('f1f10100017e', 'hex'));
-    await command.writeValue(Buffer.from('f1f12b002b7e', 'hex'));
+    this.commander = await deskService.getCharacteristic('0000ff01-0000-1000-8000-00805f9b34fb');
+    await this.commander.writeValue(Buffer.from('f1f10100017e', 'hex')); //raise
+    await this.commander.writeValue(Buffer.from('f1f12b002b7e', 'hex')); //stop
+  }
+
+  async apply() {
+    if(!this.commander && this.state === this.platform.Characteristic.PositionState.STOPPED) {
+      return;
+    }
+    let cmd;
+    if (this.state === this.platform.Characteristic.PositionState.INCREASING) {
+      if (this.currentPos >= this.targetPos) {
+        this.state = this.platform.Characteristic.PositionState.STOPPED;
+        return;
+      }
+      cmd = Buffer.from('f1f10100017e', 'hex');
+    } else if (this.state === this.platform.Characteristic.PositionState.DECREASING) {
+      if (this.currentPos <= this.targetPos) {
+        this.state = this.platform.Characteristic.PositionState.STOPPED;
+        return;
+      }
+      cmd = Buffer.from('f1f10200027e', 'hex');
+    }
+
+    if (!cmd){
+      return;
+    }
+
+    await this.commander.writeValue(cmd);
   }
 
 
@@ -144,8 +179,12 @@ export class DeskAccessory {
   handleTargetPositionSet(value) {
     this.platform.log.debug('Triggered SET TargetPosition:', value);
 
-    // We don't want any status refreshes until we complete the move.
     this.targetPos = value;
+    if (this.targetPos > this.currentPos) {
+      this.state = this.platform.Characteristic.PositionState.INCREASING;
+    } else if (this.targetPos < this.currentPos) {
+      this.state = this.platform.Characteristic.PositionState.DECREASING;
+    }
   }
 
   /**
