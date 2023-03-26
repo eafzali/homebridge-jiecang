@@ -159,7 +159,7 @@ export class DeskAccessory {
       try {
         this.platform.log.debug('run cmd', cmd);
         await this.commander.writeValue(cmd);
-        await delay(500);
+        await delay(700);
       } catch (e: any) {
         this.platform.log.error(e);
       }
