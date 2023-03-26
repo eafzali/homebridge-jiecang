@@ -181,8 +181,16 @@ export class DeskAccessory {
 
   HeightToPercentage(height: number) {
     const range = this.accessory.context.device.maxHeight - this.accessory.context.device.baseHeight;
-    return Math.round( (100 * height) / range
+    const r = Math.round( (100 * height) / range
         - (100 * this.accessory.context.device.baseHeight) / range);
+
+    if (r < 0) {
+      return 0;
+    } else if (r > 100) {
+      return 100;
+    }
+
+    return r;
   }
 
   // HomeKit setter & getters
