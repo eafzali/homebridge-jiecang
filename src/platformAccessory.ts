@@ -160,7 +160,7 @@ export class DeskAccessory {
 
       try {
         await this.commander.writeValue(cmd);
-        await delay(1000);
+        // await delay(1000);
       } catch (e: any) {
         this.platform.log.error(e);
       }
