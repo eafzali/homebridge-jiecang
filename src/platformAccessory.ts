@@ -114,10 +114,11 @@ export class DeskAccessory {
     status.on('valuechanged', buffer => {
       const [ height ] = struct('xxxxh').unpack(Uint8Array.from(buffer).buffer);
       this.currentPos = this.HeightToPercentage(height/10);
-      this.platform.log.debug('height', height, this.currentPos);
+      this.platform.log.debug('update cur height', height, this.currentPos);
       this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition).updateValue(this.currentPos);
       if (this.state === this.platform.Characteristic.PositionState.STOPPED) {
         this.targetPos = this.currentPos;
+        this.platform.log.debug('update target height', height, this.targetPos);
         this.service.getCharacteristic(this.platform.Characteristic.TargetPosition).updateValue(this.targetPos);
       }
     });
@@ -159,8 +160,9 @@ export class DeskAccessory {
       }
 
       try {
+        this.platform.log.debug('run cmd', cmd);
         await this.commander.writeValue(cmd);
-        // await delay(1000);
+        await delay(100);
       } catch (e: any) {
         this.platform.log.error(e);
       }
