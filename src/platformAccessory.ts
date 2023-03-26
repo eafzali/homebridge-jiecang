@@ -140,13 +140,13 @@ export class DeskAccessory {
       let cmd;
       if (this.state === this.platform.Characteristic.PositionState.INCREASING) {
         cmd = CmdRaise;
-        if (this.currentPos >= this.targetPos) {
+        if (this.currentPos >= this.targetPos-2) {
           this.state = this.platform.Characteristic.PositionState.STOPPED;
           cmd = CmdStop;
         }
       } else if (this.state === this.platform.Characteristic.PositionState.DECREASING) {
         cmd = CmdLower;
-        if (this.currentPos <= this.targetPos) {
+        if (this.currentPos <= this.targetPos+2) {
           this.state = this.platform.Characteristic.PositionState.STOPPED;
           cmd = CmdStop;
         }
@@ -159,7 +159,7 @@ export class DeskAccessory {
       try {
         this.platform.log.debug('run cmd', cmd);
         await this.commander.writeValue(cmd);
-        await delay(700);
+        await delay(500);
       } catch (e: any) {
         this.platform.log.error(e);
       }
