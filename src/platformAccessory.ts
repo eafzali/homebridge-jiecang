@@ -24,6 +24,8 @@ export class DeskAccessory {
 
   private commander;
 
+  private problem: any = null;
+
   constructor(
     private readonly platform: JiecangDeskController,
     private readonly accessory: PlatformAccessory,
@@ -35,10 +37,12 @@ export class DeskAccessory {
       .setCharacteristic(this.platform.Characteristic.Model, 'Bluetooth Desk Controller')
       .setCharacteristic(this.platform.Characteristic.SerialNumber, 'JCP35N-BLT');
 
-    // get the LightBulb service if it exists, otherwise create a new LightBulb service
+    this.accessory.category = this.platform.api.hap.Categories.OTHER;
+
+    // get the WindowCovering service if it exists, otherwise create a new WindowCovering service
     // you can create multiple services for each accessory
-    this.service = this.accessory.getService(this.platform.Service.Window)
-      || this.accessory.addService(this.platform.Service.Window);
+    this.service = this.accessory.getService(this.platform.Service.WindowCovering)
+      || this.accessory.addService(this.platform.Service.WindowCovering);
 
     // set the service name, this is what is displayed as the default name on the Home app
     // in this example we are using the name we stored in the `accessory.context` in the `discoverDevices` method.
@@ -49,7 +53,7 @@ export class DeskAccessory {
     this.service.setCharacteristic(this.platform.Characteristic.PositionState, this.state);
 
     // each service must implement at-minimum the "required characteristics" for the given service type
-    // see https://developers.homebridge.io/#/service/Lightbulb
+    // see https://developers.homebridge.io/#/service/WindowCovering
     // create handlers for required characteristics
 
     this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition)
@@ -68,11 +72,11 @@ export class DeskAccessory {
     this.init().then(() => {
       this.platform.log.debug('initialized');
     }).catch(e => {
-      this.platform.log.error(e);
+      this.platform.log.error('first init failed', e);
     });
 
     this.apply().catch(e => {
-      this.platform.log.error(e);
+      this.platform.log.error('apply faield', e);
     });
 
     /**
@@ -124,6 +128,7 @@ export class DeskAccessory {
     await this.commander.writeValue(CmdStop);
     await this.commander.writeValue(CmdLower);
     await this.commander.writeValue(CmdStop);
+    this.problem = null;
   }
 
   async apply() {
@@ -132,6 +137,17 @@ export class DeskAccessory {
     }
     // eslint-disable-next-line no-constant-condition
     while (true){
+
+      if(this.problem){
+        this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition).updateValue(new Error('Connection lost'));
+        try {
+          await this.init();
+        } catch (e: any) {
+          this.platform.log.error('re init failed', e);
+          continue;
+        }
+      }
+
       if(this.state === this.platform.Characteristic.PositionState.STOPPED) {
         await delay(500);
         continue;
@@ -161,7 +177,8 @@ export class DeskAccessory {
         await this.commander.writeValue(cmd);
         await delay(500);
       } catch (e: any) {
-        this.platform.log.error(e);
+        this.platform.log.error('cannot run command', e);
+        this.problem = e;
       }
     }
   }
