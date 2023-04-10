@@ -24,7 +24,7 @@ export class DeskAccessory {
 
   private commander;
 
-  private problem: any = null;
+  private problem: any = new Error('No Connection');
   private cleanup: any = null;
 
   constructor(
@@ -58,7 +58,7 @@ export class DeskAccessory {
     // create handlers for required characteristics
 
     this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition)
-      .onGet(this.handleCurrentPositionGet.bind(this));
+      .updateValue(this.problem);
 
     this.service.getCharacteristic(this.platform.Characteristic.PositionState)
       .onGet(this.handlePositionStateGet.bind(this));
@@ -69,12 +69,6 @@ export class DeskAccessory {
 
 
     this.platform.log.debug('configuring desk: ', this.accessory.context.device);
-
-    this.init().then(() => {
-      this.platform.log.debug('initialized');
-    }).catch(e => {
-      this.platform.log.error('first init failed', e);
-    });
 
     this.apply().catch(e => {
       this.platform.log.error('apply faield', e);
@@ -95,7 +89,7 @@ export class DeskAccessory {
   async init() {
     this.platform.log.info('init desk');
     if (this.cleanup) {
-      this.cleanup();
+      await this.cleanup();
       this.cleanup = null;
     }
     const {bluetooth, destroy} = createBluetooth();
@@ -142,19 +136,21 @@ export class DeskAccessory {
   }
 
   async apply() {
-    while (!this.commander) {
-      await delay(1000);
-    }
     // eslint-disable-next-line no-constant-condition
     while (true){
 
       if(this.problem){
         try {
+          this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition).updateValue(this.problem);
           await this.init();
         } catch (e: any) {
-          this.platform.log.error('re init failed', e);
+          this.platform.log.error('init failed', e);
           continue;
         }
+      }
+
+      while (!this.commander) {
+        await delay(1000);
       }
 
       if(this.state === this.platform.Characteristic.PositionState.STOPPED) {
@@ -243,10 +239,6 @@ export class DeskAccessory {
   handleTargetPositionGet() {
     this.platform.log.debug('Triggered GET TargetPosition');
 
-    if (this.problem) {
-      throw new Error('Connection lost');
-    }
-
     return this.targetPos;
   }
 
@@ -255,10 +247,6 @@ export class DeskAccessory {
    */
   handlePositionStateGet() {
     this.platform.log.debug('Triggered GET PositionState');
-
-    if (this.problem) {
-      throw new Error('Connection lost');
-    }
 
     if (this.targetPos > this.currentPos) {
       return this.platform.Characteristic.PositionState.INCREASING;
@@ -269,17 +257,6 @@ export class DeskAccessory {
     return this.platform.Characteristic.PositionState.STOPPED;
   }
 
-  /**
-     * Handle requests to get the current value of the "Current Position" characteristic
-     */
-  handleCurrentPositionGet() {
-    this.platform.log.debug('Triggered GET CurrentPosition');
-    if (this.problem) {
-      throw new Error('Connection lost');
-    }
-
-    return this.currentPos;
-  }
 }
 
 function delay(ms: number) {
