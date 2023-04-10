@@ -107,10 +107,9 @@ export class DeskAccessory {
     const status = await deskService.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
     await status.startNotifications();
     status.on('valuechanged', buffer => {
-      const [ height ] = struct('xxxxh').unpack(Uint8Array.from(buffer).buffer);
+      const [ h1, h2, h3, h4, height ] = struct('hhhhh').unpack(Uint8Array.from(buffer).buffer);
       this.currentPos = this.HeightToPercentage(height/10);
-      this.platform.log.debug('update cur height', height, this.currentPos);
-      this.platform.log.debug('buf', struct('hhhhh').unpack(Uint8Array.from(buffer).buffer));
+      this.platform.log.debug('update cur height', height, this.currentPos, h1, h2, h3, h4);
       this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition).updateValue(this.currentPos);
       if (this.state === this.platform.Characteristic.PositionState.STOPPED) {
         this.targetPos = this.currentPos;
@@ -131,6 +130,7 @@ export class DeskAccessory {
     await this.commander.writeValue(CmdQuery);
     await this.commander.writeValue(CmdQuery);
     this.problem = null;
+    this.platform.log.info('init desk done');
     this.cleanup = async () => {
       await device.disconnect();
       destroy();
