@@ -107,10 +107,9 @@ export class DeskAccessory {
     const status = await deskService.getCharacteristic('0000ff02-0000-1000-8000-00805f9b34fb');
     await status.startNotifications();
     status.on('valuechanged', buffer => {
-      const [ h1, h2, height ] = struct('hhh').unpack(Uint8Array.from(buffer).buffer);
+      const [ h1, b1, b2, height ] = struct('hbbh').unpack(Uint8Array.from(buffer).buffer);
       this.currentPos = this.HeightToPercentage(height/10);
-      this.platform.log.debug('update cur height', height, this.currentPos);
-      this.platform.log.debug('ch', h1, h2);
+      this.platform.log.debug('update cur height', height, this.currentPos, h1, b1, b2);
       this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition).updateValue(this.currentPos);
       if (this.state === this.platform.Characteristic.PositionState.STOPPED) {
         this.targetPos = this.currentPos;
