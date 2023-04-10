@@ -25,6 +25,7 @@ export class DeskAccessory {
   private commander;
 
   private problem: any = null;
+  private cleanup: any = null;
 
   constructor(
     private readonly platform: JiecangDeskController,
@@ -92,6 +93,11 @@ export class DeskAccessory {
   }
 
   async init() {
+    this.platform.log.info('init desk');
+    if (this.cleanup) {
+      this.cleanup();
+      this.cleanup = null;
+    }
     const {bluetooth, destroy} = createBluetooth();
     const adapter = await bluetooth.defaultAdapter();
 
@@ -129,6 +135,10 @@ export class DeskAccessory {
     await this.commander.writeValue(CmdLower);
     await this.commander.writeValue(CmdStop);
     this.problem = null;
+    this.cleanup = async () => {
+      await device.disconnect();
+      destroy();
+    };
   }
 
   async apply() {
@@ -139,7 +149,6 @@ export class DeskAccessory {
     while (true){
 
       if(this.problem){
-        this.service.getCharacteristic(this.platform.Characteristic.CurrentPosition).updateValue(new Error('Connection lost'));
         try {
           await this.init();
         } catch (e: any) {
@@ -233,6 +242,11 @@ export class DeskAccessory {
    */
   handleTargetPositionGet() {
     this.platform.log.debug('Triggered GET TargetPosition');
+
+    if (this.problem) {
+      throw new Error('Connection lost');
+    }
+
     return this.targetPos;
   }
 
@@ -241,6 +255,10 @@ export class DeskAccessory {
    */
   handlePositionStateGet() {
     this.platform.log.debug('Triggered GET PositionState');
+
+    if (this.problem) {
+      throw new Error('Connection lost');
+    }
 
     if (this.targetPos > this.currentPos) {
       return this.platform.Characteristic.PositionState.INCREASING;
@@ -256,6 +274,10 @@ export class DeskAccessory {
      */
   handleCurrentPositionGet() {
     this.platform.log.debug('Triggered GET CurrentPosition');
+    if (this.problem) {
+      throw new Error('Connection lost');
+    }
+
     return this.currentPos;
   }
 }
