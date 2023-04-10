@@ -96,6 +96,7 @@ export class JiecangDeskController implements DynamicPlatformPlugin {
 
         // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. eg.:
         existingAccessory.context.device = device;
+        existingAccessory.category = this.api.hap.Categories.OTHER;
         this.api.updatePlatformAccessories([existingAccessory]);
 
         // create the accessory handler for the restored accessory

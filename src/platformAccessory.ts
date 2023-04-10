@@ -13,12 +13,15 @@ import struct from '@aksel/structjs';
 const CmdStop = Buffer.from('f1f12b002b7e', 'hex');
 const CmdRaise = Buffer.from('f1f10100017e', 'hex');
 const CmdLower = Buffer.from('f1f10200027e', 'hex');
+const CmdQuery = Buffer.from('f1f10700077e', 'hex');
 
 export class DeskAccessory {
   private service: Service;
 
   private currentPos = 0;
   private targetPos = 0;
+
+  private cycle = 0;
 
   private state;
 
@@ -124,10 +127,8 @@ export class DeskAccessory {
     });
 
     this.commander = await deskService.getCharacteristic('0000ff01-0000-1000-8000-00805f9b34fb');
-    await this.commander.writeValue(CmdRaise);
-    await this.commander.writeValue(CmdStop);
-    await this.commander.writeValue(CmdLower);
-    await this.commander.writeValue(CmdStop);
+    await this.commander.writeValue(CmdQuery);
+    await this.commander.writeValue(CmdQuery);
     this.problem = null;
     this.cleanup = async () => {
       await device.disconnect();
@@ -171,6 +172,9 @@ export class DeskAccessory {
           this.state = this.platform.Characteristic.PositionState.STOPPED;
           cmd = CmdStop;
         }
+      } else if (this.cycle++ % 100 === 0){
+        cmd = CmdQuery;
+        this.cycle = 0;
       }
 
       if (!cmd){
